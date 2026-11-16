@@ -39,25 +39,52 @@ ActiveMacWindow() {
 
 RefreshMacTitles() {
     global macTitles
-    nextTitles := Map()
-    if ProcessExist("GameViewer.exe") {
-        path := A_Temp "\uu-mac-titles-" ProcessExist() ".txt"
-        shell := A_WinDir "\System32\WindowsPowerShell\v1.0\powershell.exe"
-        helper := A_ScriptDir "\Get-UUMacTitles.ps1"
-        try {
-            result := RunWait(Format('"{1}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{2}" "{3}"', shell, helper, path), , "Hide")
-            if result = 0 {
-                for title in StrSplit(FileRead(path, "UTF-8"), Chr(10), Chr(13)) {
-                    if title != ""
-                        nextTitles[title] := true
-                }
-            }
-        } catch OSError {
-            ; Keep Ctrl+V native if the device list is unavailable.
-        } finally {
-            if FileExist(path)
-                FileDelete(path)
+    if !ProcessExist("GameViewer.exe") {
+        macTitles := Map()
+        return
+    }
+
+    path := A_Temp "\uu-mac-titles-" ProcessExist() "-" A_TickCount ".txt"
+    shell := A_WinDir "\System32\WindowsPowerShell\v1.0\powershell.exe"
+    helper := A_ScriptDir "\Get-UUMacTitles.ps1"
+    try {
+        Run(Format('"{1}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{2}" "{3}"', shell, helper, path), , "Hide", &pid)
+    } catch OSError {
+        macTitles := Map()
+        return
+    }
+
+    ; Leave the hotkey thread free while the UU device list is generated.
+    started := A_TickCount
+    SetTimer(() => CheckMacTitles(pid, path, started), -100)
+}
+
+CheckMacTitles(pid, path, started) {
+    global macTitles
+    if ProcessExist(pid) {
+        if A_TickCount - started < 10000 {
+            SetTimer(() => CheckMacTitles(pid, path, started), -100)
+            return
         }
+
+        try ProcessClose(pid)
+        try FileDelete(path)
+        macTitles := Map()
+        return
+    }
+
+    nextTitles := Map()
+    try {
+        if FileExist(path) {
+            for title in StrSplit(FileRead(path, "UTF-8"), Chr(10), Chr(13)) {
+                if title != ""
+                    nextTitles[title] := true
+            }
+        }
+    } catch OSError {
+        nextTitles := Map()
+    } finally {
+        try FileDelete(path)
     }
     macTitles := nextTitles
 }
