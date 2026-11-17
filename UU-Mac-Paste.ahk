@@ -9,6 +9,7 @@ pasteDelayMs := 120
 A_IconTip := "UU macOS - Ctrl+V to Command+V"
 RefreshMacTitles()
 SetTimer(RefreshMacTitles, 30000)
+SetTimer(RefreshRemoteHook, 250)
 
 #HotIf ActiveMacWindow()
 $^v:: {
@@ -35,6 +36,14 @@ ActiveMacWindow() {
     catch TargetError
         return 0
     return title != "网易UU远程" && macTitles.Has(title) ? hwnd : 0
+}
+
+RefreshRemoteHook() {
+    static lastTarget := 0
+    target := A_IsSuspended ? 0 : ActiveMacWindow()
+    if target && target != lastTarget
+        InstallKeybdHook(true, true)
+    lastTarget := target
 }
 
 RefreshMacTitles() {
