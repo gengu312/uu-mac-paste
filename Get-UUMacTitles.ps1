@@ -23,7 +23,7 @@ try {
     }
     if ($cli.ExitCode -ne 0) { exit 1 }
     $list = $reply.GetAwaiter().GetResult() | ConvertFrom-Json
-    if (!$list.success -or $null -eq $list.data.items) { exit 1 }
+    if (!$list.success -or $null -eq $list.data.items -or @($list.data.items).Count -eq 0) { exit 1 }
 
     $names = @($list.data.items | Group-Object -Property deviceName | ForEach-Object {
         if ($_.Count -eq 1 -and $_.Group[0].platform -ceq 'macOS' -and $_.Name -notmatch '[\r\n]') {

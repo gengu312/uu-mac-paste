@@ -5,10 +5,13 @@ SetTitleMatchMode(3)
 
 uuWindow := "ahk_class Qt51519QWindowIcon ahk_exe GameViewer.exe"
 macTitles := Map()
+watchedUuPid := 0
+queryRunning := false
+refreshAfter := 0
 pasteDelayMs := 120
 A_IconTip := "UU macOS - Ctrl+V to Command+V"
 RefreshMacTitles()
-SetTimer(RefreshMacTitles, 30000)
+SetTimer(RefreshMacTitles, 500)
 SetTimer(RefreshRemoteHook, 250)
 
 #HotIf ActiveMacWindow()
@@ -47,53 +50,72 @@ RefreshRemoteHook() {
 }
 
 RefreshMacTitles() {
-    global macTitles
-    if !ProcessExist("GameViewer.exe") {
+    global macTitles, watchedUuPid, queryRunning, refreshAfter
+
+    uuPid := ProcessExist("GameViewer.exe")
+    if uuPid != watchedUuPid {
+        watchedUuPid := uuPid
         macTitles := Map()
-        return
+        refreshAfter := 0
     }
+
+    if !uuPid || queryRunning || A_TickCount < refreshAfter
+        return
 
     path := A_Temp "\uu-mac-titles-" ProcessExist() "-" A_TickCount ".txt"
     shell := A_WinDir "\System32\WindowsPowerShell\v1.0\powershell.exe"
     helper := A_ScriptDir "\Get-UUMacTitles.ps1"
+    queryRunning := true
     try {
         Run(Format('"{1}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{2}" "{3}"', shell, helper, path), , "Hide", &pid)
     } catch OSError {
-        macTitles := Map()
+        FinishMacTitles(uuPid, Map(), false)
         return
     }
 
     ; Leave the hotkey thread free while the UU device list is generated.
     started := A_TickCount
-    SetTimer(() => CheckMacTitles(pid, path, started), -100)
+    SetTimer(() => CheckMacTitles(uuPid, pid, path, started), -100)
 }
 
-CheckMacTitles(pid, path, started) {
-    global macTitles
+CheckMacTitles(uuPid, pid, path, started) {
     if ProcessExist(pid) {
         if A_TickCount - started < 10000 {
-            SetTimer(() => CheckMacTitles(pid, path, started), -100)
+            SetTimer(() => CheckMacTitles(uuPid, pid, path, started), -100)
             return
         }
 
         try ProcessClose(pid)
         try FileDelete(path)
-        macTitles := Map()
+        FinishMacTitles(uuPid, Map(), false)
         return
     }
 
     nextTitles := Map()
+    querySucceeded := false
     try {
         if FileExist(path) {
             for title in StrSplit(FileRead(path, "UTF-8"), Chr(10), Chr(13)) {
                 if title != ""
                     nextTitles[title] := true
             }
+            querySucceeded := true
         }
     } catch OSError {
         nextTitles := Map()
     } finally {
         try FileDelete(path)
     }
+    FinishMacTitles(uuPid, nextTitles, querySucceeded)
+}
+
+FinishMacTitles(uuPid, nextTitles, querySucceeded) {
+    global macTitles, watchedUuPid, queryRunning, refreshAfter
+    queryRunning := false
+    if uuPid != watchedUuPid || uuPid != ProcessExist("GameViewer.exe")
+        return
+
     macTitles := nextTitles
+    ; UU can start before its device directory is ready. Retry promptly.
+    refreshAfter := A_TickCount + (querySucceeded ? 30000 : 2000)
 }
