@@ -7,7 +7,15 @@
 1. 安装 [AutoHotkey v2](https://www.autohotkey.com/)，使用带有 `uuyc-cli.exe` 的 [网易 UU 远程](https://uuyc163.net/) Windows 客户端。
 2. 确认在 Mac 远控窗口内手动按 `Alt+V` 能粘贴。UU 中的 Windows `Alt → Command` 映射需要已生效。
 3. 下载或克隆本仓库，将两个脚本放在同一目录，双击 `UU-Mac-Paste.ahk`。右键 AutoHotkey 托盘图标，可用 **Suspend Hotkeys** 暂停改键，或用 **Exit** 退出。
-4. 需要登录自启时，按 `Win+R` 打开 `shell:startup`，把 `UU-Mac-Paste.ahk` 的快捷方式放进去。
+## 登录自启
+
+按 `Win+R` 打开 `shell:startup`，新建快捷方式，把目标设为以下命令，并替换其中两个路径。已有直接启动 AHK 的快捷方式可改用这一条。
+
+```powershell
+powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Tools\uu-mac-paste\Start-UUMacPaste.ps1" -AutoHotkeyPath "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
+```
+
+登录后，启动器会等待当前用户的 UU 客户端进程出现，再启动 AutoHotkey。AutoHotkey 随后确认设备列表就绪。
 
 ## 匹配与验证
 
