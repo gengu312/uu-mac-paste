@@ -10,23 +10,30 @@ queryRunning := false
 refreshAfter := 0
 pasteDelayMs := 120
 A_IconTip := "UU macOS - Ctrl+V to Command+V"
+TracePaste("started")
 RefreshMacTitles()
 SetTimer(RefreshMacTitles, 500)
 SetTimer(RefreshRemoteHook, 250)
 
 #HotIf ActiveMacWindow()
 $^v:: {
+    TracePaste("ctrl-v intercepted")
     target := ActiveMacWindow()
     if !target
         return
 
     Sleep(pasteDelayMs)
     ; Let the original Ctrl release reach the remote session before Alt+V.
-    if !KeyWait("LCtrl", "T1") || !KeyWait("RCtrl", "T1")
+    if !KeyWait("LCtrl", "T1") || !KeyWait("RCtrl", "T1") {
+        TracePaste("ctrl release timed out")
         return
+    }
 
-    if !A_IsSuspended && ActiveMacWindow() = target
+    if !A_IsSuspended && ActiveMacWindow() = target {
         SendEvent("!v")
+        TracePaste("alt-v sent")
+    } else
+        TracePaste("focus changed")
 }
 #HotIf
 
@@ -44,8 +51,11 @@ ActiveMacWindow() {
 RefreshRemoteHook() {
     static lastTarget := 0
     target := A_IsSuspended ? 0 : ActiveMacWindow()
-    if target && target != lastTarget
+    SetVoiceMode(!ActiveMacWindow())
+    if target && target != lastTarget {
         InstallKeybdHook(true, true)
+        TracePaste("mac focus hook refreshed")
+    }
     lastTarget := target
 }
 
@@ -116,6 +126,44 @@ FinishMacTitles(uuPid, nextTitles, querySucceeded) {
         return
 
     macTitles := nextTitles
+    TracePaste("discovery success=" querySucceeded " count=" macTitles.Count)
     ; UU can start before its device directory is ready. Retry promptly.
     refreshAfter := A_TickCount + (querySucceeded ? 30000 : 2000)
+}
+
+TracePaste(eventName) {
+    path := EnvGet("LOCALAPPDATA") "\UU-Mac-Paste.log"
+    try {
+        if FileExist(path) && FileGetSize(path) > 65536
+            FileDelete(path)
+        FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") " " eventName Chr(10), path, "UTF-8")
+    }
+}
+SetVoiceMode(direct) {
+    static applied := -1
+    if applied = direct
+        return
+    path := A_AppData "\Shandianshuo\config.json"
+    stage := path ".uu-route-" ProcessExist()
+    try {
+        original := FileRead(path, "UTF-8")
+        changed := RegExReplace(original, '("use_direct_input"\s*:\s*)(true|false)', '$1' (direct ? "true" : "false"), &count)
+        if count != 1
+            return
+        if changed != original {
+            file := FileOpen(stage, "w", "UTF-8-RAW")
+            file.Write(changed)
+            file.Close()
+            if FileRead(path, "UTF-8") != original
+                return
+            FileMove(stage, path, 1)
+        }
+        applied := direct
+        TracePaste(direct ? "local direct mode" : "mac paste mode")
+    } catch OSError {
+        return
+    } finally {
+        if FileExist(stage)
+            try FileDelete(stage)
+    }
 }

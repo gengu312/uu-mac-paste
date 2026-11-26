@@ -17,6 +17,10 @@ powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy B
 
 登录后，启动器会等待当前用户的 UU 客户端进程出现，再启动 AutoHotkey。AutoHotkey 随后确认设备列表就绪。
 
+## 闪电说输入方式
+
+脚本按前台窗口切换闪电说 v0.8.2 的输入方式。在 Windows 本地使用实验室的直接输入，绕开剪贴板；进入已识别的 UU macOS 远控窗口时切回粘贴。已在一次持续连接中验证本机 ChatGPT 和远端 Mac mini 分别上屏。脚本退出时闪电说会保留最后一次设置。
+
 ## 匹配与验证
 
 - 脚本从正在运行的 UU 客户端目录找到 CLI，UU 启动或重启后立即查询设备列表。列表为空或查询失败时约 2 秒后重试，成功后每 30 秒刷新。只有列表中唯一同名且系统为 `macOS` 的设备才会匹配。设备未知、重名或查询失败时，`Ctrl+V` 保持原样。
